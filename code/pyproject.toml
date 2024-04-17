@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "vigenerecracker"
+version = "0.1.0"
+description = "Aplicación para romper el cifrado de Vigenere utilizando el método de Kasiski"
+authors = ["David Fraga Rodríguez <david.fraga.rodriguez@udc.es>", "María Rey Escobar <maria.rescobar@udc.es>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+black = "^24.4.0"
+
+[tool.poetry.scripts]
+lint = "poetry:lint"
+fmt = "poetry:format_code"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
