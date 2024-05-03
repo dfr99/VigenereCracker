@@ -9,11 +9,11 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.10"
 black = "^24.4.0"
+numpy = "^1.26.4"
 
 [tool.poetry.scripts]
 lint = "poetry:lint"
 fmt = "poetry:format_code"
-
 
 [build-system]
 requires = ["poetry-core"]

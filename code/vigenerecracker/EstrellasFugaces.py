@@ -1,7 +1,9 @@
 # kasiski_attack.py
 #
 # Author: Ralph Gootee <rgootee@gmail.com>
-#
+# Modified by:
+#	- David Fraga Rodríguez <david.fraga.rodriguez@udc.es>
+#	- María Rey Escobar <maria.rescobar@udc.es>
 
 #-------------------------------------------------------------------------------
 from xml.dom.minidom import parse # used for xml parsing
