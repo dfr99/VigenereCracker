@@ -6,218 +6,150 @@
 #	- María Rey Escobar <maria.rescobar@udc.es>
 
 #-------------------------------------------------------------------------------
-from xml.dom.minidom import parse # used for xml parsing
-import sys # for command line arguments
-import os # to see if a file exists
-
-#-------------------------------------------------------------------------------
-# euclidian algorithm
-def gcd(a,b):
-	while b != 0:
-		t = b;
-		b = a % b;
-		a = t;
-	return a
-
-#-------------------------------------------------------------------------------
-def GcdArray(gcdz):
-
-	""" Takes the greatest common divisor of an entire array """
-
-	if len(gcdz) < 2: return gcdz[0];
-	
-	myGcd = gcd(gcdz[0],gcdz[1]);	
-
-	for i in range(2,len(gcdz)):
-		myGcd = gcd(gcdz[i],myGcd);
-
-	return myGcd;
-
-#-------------------------------------------------------------------------------
-def ParseXMLFile(file):
-
-	"""Parses a xml file and runs the core of the string matcher on the results
-
-	Keyword Arguments:
-	file -- the file name with which to parse
-	
-	"""
-
-	string = "";
-
-	# reads in the dom structure
-	dom = parse(file);	
-
-	# generate touples
-	for node in dom.getElementsByTagName('string'): 
-		string = node.firstChild.nodeValue;
-	
-	print "XML File: ", file;
-	print "String: ", string;
-
-	return string;
-
-#-------------------------------------------------------------------------------
-def CalcKeyLength(string,gramLength,verbose=0):
-
-	""" Calculates the suggested passkey length of the string using Kasiski """
-
-	locations = [];
-	distances = [];
-
-	#locate all grams
-	for i in range(len(string)):
-		gram = string[i:i+gramLength];
-		
-		# make sure we don't get stuck with shorties
-		if len(gram) < gramLength: break
-	
-		locations.append([]);
-
-		find = string.find(gram,0);
-		while find != -1:
-			locations[i].append(find);
-			find = string.find(gram,find+1);
-	
-		# only calculate the distances if need be
-		if len(locations[i]) > 1:
-			for j in range(1,len(locations[i])):
-				distances.append(locations[i][j] - locations[i][0]);
-
-			if verbose: print "gram: ",gram;
-			if verbose: print "found: ", locations[i];
-
-	if verbose: print "distances: ", distances;
-	
-	myGcd = GcdArray(distances);	
-
-	return myGcd;
-
-#-------------------------------------------------------------------------------
-def ConstructY(string,m):
-
-	""" 
-		Constructs the Y_i vectors of string 
-
-		Input Arguments:
-		string -- the ciphertext
-		m -- the passkey length
-	
-	"""
-
-	# figure this out
-	y = [];
-	for i in range(m):y.append('');
-
-	for i in range(len(string)):
-		index = i % m;
-		y[index] += string[i];
-
-	return y;
-				
-#-------------------------------------------------------------------------------
-def CalcMg(y):
-
-	""" calculates the M_g value for a given string vector """	
-	
-	cNums = map(chr, range(65, 91));
-
-	mg = [];
-	f = range(len(cNums));
-
-	p = [.082,.015,.028,.043,.127,.022,.020,.061,.070,.002,.008,.040,.024,.067];
-	p+=	[.075,.019,.001,.060,.063,.091,.028,.010,.023,.001,.020,.001];
-
-	#print "p=",p;
-
-	# frequency & probabiliy
-	for i in range(len(cNums)):
-		f[i] = y.count(cNums[i]);	
-		mg.append(0);
-
-	#print "f:",f;
-	
-	for g in range(len(cNums)):
-		for i in range(len(cNums)):
-			fig = f[(i+g)% len(f)];
-			mg[g] += ((p[i]*fig) / float(len(y)));
-
-	#print "mg: ", mg;
-	return mg;
-
-#-------------------------------------------------------------------------------
-def SuggestKey(mg):
-	
-	""" Suggestes a key, given the maximum likelihood """
-
-	contend = [];
-	cNums = map(chr, range(65, 91));
-
-	i = max(mg);
-	return cNums[mg.index(i)];
-
-#-------------------------------------------------------------------------------
-def Attack(string,n,verbose=0):
-	
-	# construct y[i]
-	y = ConstructY(string,n);
-	if verbose:
-		for i in range(n): print 'y(%i): %s' % (i,y[i]);
-
-	mg = [];
-	# calculate Mg
-	for i in range(n): 
-		m = CalcMg(y[i]);
-		mg.append(m);
-		if verbose: print "M_g(y[i])=",m;		
-
-	# suggest the key
-	key = "";
-	for i in range(n):
-		key += SuggestKey(mg[i]);
-
-	return key;
-
-	
-#-------------------------------------------------------------------------------
-def Main():
-
-	""" Main function """
-
-	print "Vigenere Cipher Attack";
-
-	verbose =0;
-	file = "";
-	gramLength = 4;
-	keyLength = 0;
-
-	#parse command line arguments 	
-	for i in range(1,len(sys.argv)): 
-		if sys.argv[i] == "-v": 
-			verbose = 1
-		if sys.argv[i] == "-g": 
-			gramLength = int(sys.argv[i+1]);
-		if sys.argv[i] == "-k": 
-			keyLength = int(sys.argv[i+1]);
-		if i+1 == len(sys.argv):
-			file = sys.argv[i];
-	
-	string = ParseXMLFile(file);
-	#remove all newlines from string
-	string = string.replace('\n','');	
-	string = string.replace(' ','');	
-
-	if( keyLength == 0):
-		print "Gram Length: ",gramLength;
-		keyLength = CalcKeyLength(string,gramLength,verbose);
-		
-	if verbose: print "Key Length:", keyLength;
-		
-	passkey = Attack(string,keyLength,verbose);
-	print "Suggested Passkey:",passkey
+from sys import argv
+from math import gcd
+from functools import reduce
+from collections import deque
+from numpy import linalg, asarray
 
 
-#-------------------------------------------------------------------------------
-# to run the function if needed
-if __name__ == "__main__":
-    Main();
+# -------------------------------------------------------------------------------
+def calc_key_length(string, gram_length):
+    """Calculates the suggested passkey length of the string using Kasiski"""
+
+    locations = []
+    distances = []
+
+    # locate all grams
+    for i in range(len(string)):
+        gram = string[i:i + gram_length]
+
+        # make sure we don't get stuck with shorties
+        if len(gram) < gram_length:
+            break
+
+        locations.append([])
+
+        find = string.find(gram, 0)
+        while find != -1:
+            locations[i].append(find)
+            find = string.find(gram, find + 1)
+
+        # only calculate the distances if needed
+        if len(locations[i]) > 1:
+            for j in range(1, len(locations[i])):
+                distances.append(locations[i][j] - locations[i][0])
+
+    return reduce(gcd, distances)
+
+def construct_y(string, key_length):
+    """
+    Constructs the Y_i vectors of string
+
+    Input Arguments:
+    string -- the ciphertext
+    keyLength -- the passkey length
+
+    """
+
+    # figure this out
+    y = [''] * key_length
+
+    # Mete cada letra del texto en la posicion de la letra de la clave que la cifro
+    for i in range(len(string)):
+        y[i % key_length] += string[i]
+
+    return y
+
+def calc_mg(y, alfab, prob):
+    """calculates the M_g value for a given string vector"""
+
+    # frequency & probability
+    fre = deque([0] * len(alfab))
+    for i in range(len(alfab)):
+        fre[i] = y.count(alfab[i])
+
+    mg = [0] * len(alfab)
+    for g in range(len(alfab)):
+        suma = 0
+        for i in range(len(alfab)):
+            suma += prob[i] * fre[i]  # Probabilidad de letra por numero de ocurrencias
+        mg[g] = suma / len(y)  # Se divide el sumatorio entre la longitud de y
+        fre.rotate(-1)  # Desplazamiento a la izquierda
+
+    return mg
+
+# Hackeo de clave
+def attack(string, key_length, prob):
+    # construct y[i]
+    y = construct_y(string, key_length)
+
+    # calculate Mg
+    mg = []
+    for i in range(key_length):
+        m = calc_mg(y[i], alfab, prob)
+        mg.append(m)
+    # suggest the key
+    key = ""
+    for i in range(key_length):
+        key += alfab[mg[i].index(max(mg[i]))]
+
+    return key
+
+""" Probabilidades por cada idioma """
+prob_ENG = [.08167, .01492, .02782, .04253, .12702, .02228, .02015, .06094, .06966, .00153, .00772, .04025, .02406,
+            .06749, .0, .07507, .01929, .00095, .05987, .06327, .09056, .02758, .00658, .0236, .0015, .01654, .00074]
+prob_SPN = [.1216, .0149, .0387, .0467, .1408, .0069, .01, 0.018, .0598, .0052, .0011, .0524, .0308, .07, .0, .092,
+            .0289, .0111, .0641, .072, .046, .0469, .0105, .0004, .0014, .0109, .0047]
+prob_FRN = [.08173, .00901, .03345, .03669, .16716, .01066, .00866, .00737, .07579, .00613, .0074, .05456, .02968,
+            .07095, .0, .05837, .02521, .01362, .0693, .07948, .07244, .06429, .01838, .00049, .00427, .00128, .00326]
+
+def detect_language(string):
+    """
+    Detects the language of the input string based on character frequency.
+    """
+
+    # Count the frequency of each character
+    freq = {}
+    for char in string:
+        freq[char] = freq.get(char, 0) + 1
+
+    # Sort frequencies in descending order
+    sorted_freq = sorted(freq.items(), key=lambda x: x[1], reverse=True)
+
+    # Define language based on the most frequent characters
+    if sorted_freq[0][0] in "ETAOINSHRD":
+        return "English"
+    elif sorted_freq[0][0] in "EASIONRT":
+        return "Spanish"
+    elif sorted_freq[0][0] in "ETAINOSRL":
+        return "French"
+    else:
+        return "Unknown"
+    
+# Get the input message
+message = input("Enter the encrypted message: ")
+
+# Detect the language of the message
+detected_language = detect_language(message)
+
+# Choose the probabilities and alphabet based on the detected language
+if detected_language == "English":
+    prob = prob_ENG
+    alfab = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+elif detected_language == "Spanish":
+    prob = prob_SPN
+    alfab = "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ"
+elif detected_language == "French":
+    prob = prob_FRN
+    alfab = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+# Calculate the key length
+gram_length = 6
+key_length = calc_key_length(message, gram_length)
+
+# Perform the attack and get the key
+key = attack(message, key_length, prob)
+
+# Print the key
+print("Decrypted Key:", key)
