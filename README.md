@@ -13,5 +13,5 @@ A continuación, se muestran los comandos para construir la imagen de Docker y e
 git clone https://github.com/dfr99/VigenereCracker.git
 cd VigenereCracker
 docker build -t estrellas_fugaces -f dist/Dockerfile .
-docker exec -it --rm --name estrellas_fugaces estrellas_fugaces <fichero_alfabeto> <fichero_texto_cifrado>
+docker run -it --rm --name estrellas_fugaces -v <ruta_fichero_cifrado_local>:<ruta_fichero_cifrado_contenedor> estrellas_fugaces <ruta_fichero_cifrado_contenedor>
 ```

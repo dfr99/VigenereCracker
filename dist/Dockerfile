@@ -5,6 +5,7 @@ WORKDIR /usr/src/app
 COPY code/ .
 
 RUN apk add poetry=1.7.1-r0 --no-cache && \
-poetry install
+poetry install && \
+rm -rf $POETRY_CACHE_DIR
 
-ENTRYPOINT ["python", "vigenerecracker/EstrellasFugaces.py"]
+ENTRYPOINT ["poetry", "run", "python", "vigenerecracker/EstrellasFugaces.py"]
